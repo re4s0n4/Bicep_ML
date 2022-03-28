@@ -1,0 +1,1940 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.4.1318.3566",
+      "templateHash": "6549880442612037991"
+    }
+  },
+  "parameters": {
+    "prefix": {
+      "type": "string",
+      "metadata": {
+        "description": "Prefix for all resource names."
+      },
+      "maxLength": 10,
+      "minLength": 2
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region used for the deployment of all resources."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Set of tags to apply to all resources."
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "192.168.0.0/16",
+      "metadata": {
+        "description": "Virtual network address prefix"
+      }
+    },
+    "trainingSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "192.168.0.0/24",
+      "metadata": {
+        "description": "Training subnet address prefix"
+      }
+    }
+  },
+  "variables": {
+    "name": "[toLower(format('{0}', parameters('prefix')))]",
+    "uniqueSuffix": "[substring(uniqueString(resourceGroup().id), 0, 4)]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "logAnalyticsWorkspaceName-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "logAnalyticsWorkspaceName": {
+            "value": "[format('law-{0}-{1}', variables('name'), variables('uniqueSuffix'))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "17110263204319201152"
+            }
+          },
+          "parameters": {
+            "logAnalyticsWorkspaceName": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Log Analytics Workspace"
+              }
+            },
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "The Azure Region to deploy the resrouce group into"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2021-12-01-preview",
+              "name": "[parameters('logAnalyticsWorkspaceName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "retentionInDays": 30,
+                "features": {
+                  "searchVersion": 1
+                },
+                "sku": {
+                  "name": "PerGB2018"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "logAnalyticsWorkspaceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('nsg-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "nsgName": {
+            "value": "[format('nsg-{0}-{1}', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')).outputs.logAnalyticsWorkspaceId.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "3098359637420831269"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region of the deployment"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to add to the resources"
+              }
+            },
+            "nsgName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the network security group"
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/networkSecurityGroups",
+              "apiVersion": "2020-07-01",
+              "name": "[parameters('nsgName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "securityRules": [
+                  {
+                    "name": "BatchNodeManagement",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "29876-29877",
+                      "sourceAddressPrefix": "BatchNodeManagement",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 120,
+                      "direction": "Inbound"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearning",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "44224",
+                      "sourceAddressPrefix": "AzureMachineLearning",
+                      "destinationAddressPrefix": "*",
+                      "access": "Allow",
+                      "priority": 130,
+                      "direction": "Inbound"
+                    }
+                  },
+                  {
+                    "name": "AzureActiveDirectory",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "*",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureActiveDirectory",
+                      "access": "Allow",
+                      "priority": 140,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureMachineLearningOutbound",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureMachineLearning",
+                      "access": "Allow",
+                      "priority": 150,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureResourceManager",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureResourceManager",
+                      "access": "Allow",
+                      "priority": 160,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureStorageAccount",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('Storage.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 170,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureFrontDoor",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "AzureFrontDoor.FrontEnd",
+                      "access": "Allow",
+                      "priority": 180,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "AzureContainerRegistry",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "*",
+                      "destinationAddressPrefix": "[format('AzureContainerRegistry.{0}', parameters('location'))]",
+                      "access": "Allow",
+                      "priority": 190,
+                      "direction": "Outbound"
+                    }
+                  },
+                  {
+                    "name": "MicrosoftContainerRegistry",
+                    "properties": {
+                      "protocol": "Tcp",
+                      "sourcePortRange": "*",
+                      "destinationPortRange": "443",
+                      "sourceAddressPrefix": "VirtualNetwork",
+                      "destinationAddressPrefix": "MicrosoftContainerRegistry",
+                      "access": "Allow",
+                      "priority": 200,
+                      "direction": "Outbound"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Network/networkSecurityGroups/{0}', parameters('nsgName'))]",
+              "name": "[format('ds-{0}', parameters('nsgName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "NetworkSecurityGroupEvent",
+                    "enabled": true,
+                    "retentionPolicy": {
+                      "days": 90,
+                      "enabled": true
+                    }
+                  },
+                  {
+                    "category": "NetworkSecurityGroupRuleCounter",
+                    "enabled": true,
+                    "retentionPolicy": {
+                      "days": 90,
+                      "enabled": true
+                    }
+                  }
+                ],
+                "metrics": []
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsgName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "networkSecurityGroup": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsgName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "virtualNetworkName": {
+            "value": "[format('vnet-{0}-{1}', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "natGatewayName": {
+            "value": "[format('gw-{0}-{1}', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "publicIPaddressName": {
+            "value": "[format('pip-{0}-{1}', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "networkSecurityGroupId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('nsg-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.networkSecurityGroup.value]"
+          },
+          "vnetAddressPrefix": {
+            "value": "[parameters('vnetAddressPrefix')]"
+          },
+          "trainingSubnetPrefix": {
+            "value": "[parameters('trainingSubnetPrefix')]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')).outputs.logAnalyticsWorkspaceId.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "5378862118258968604"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Azure region of the deployment"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to add to the resources"
+              }
+            },
+            "virtualNetworkName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the virtual network resource"
+              }
+            },
+            "natGatewayName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the NAT Gatway resource"
+              }
+            },
+            "publicIPaddressName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Public IP Address resource"
+              }
+            },
+            "networkSecurityGroupId": {
+              "type": "string",
+              "metadata": {
+                "description": "Group ID of the network security group"
+              }
+            },
+            "vnetAddressPrefix": {
+              "type": "string",
+              "defaultValue": "192.168.0.0/16",
+              "metadata": {
+                "description": "Virtual network address prefix"
+              }
+            },
+            "trainingSubnetPrefix": {
+              "type": "string",
+              "defaultValue": "192.168.0.0/24",
+              "metadata": {
+                "description": "Training subnet address prefix"
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/virtualNetworks",
+              "apiVersion": "2020-07-01",
+              "name": "[parameters('virtualNetworkName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "addressSpace": {
+                  "addressPrefixes": [
+                    "[parameters('vnetAddressPrefix')]"
+                  ]
+                },
+                "subnets": [
+                  {
+                    "name": "snet-training",
+                    "properties": {
+                      "addressPrefix": "[parameters('trainingSubnetPrefix')]",
+                      "privateEndpointNetworkPolicies": "Disabled",
+                      "privateLinkServiceNetworkPolicies": "Disabled",
+                      "serviceEndpoints": [
+                        {
+                          "service": "Microsoft.KeyVault"
+                        },
+                        {
+                          "service": "Microsoft.ContainerRegistry"
+                        },
+                        {
+                          "service": "Microsoft.Storage"
+                        }
+                      ],
+                      "networkSecurityGroup": {
+                        "id": "[parameters('networkSecurityGroupId')]"
+                      },
+                      "natGateway": {
+                        "id": "[resourceId('Microsoft.Network/natGateways', parameters('natGatewayName'))]"
+                      }
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/natGateways', parameters('natGatewayName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/natGateways",
+              "apiVersion": "2021-05-01",
+              "name": "[parameters('natGatewayName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "idleTimeoutInMinutes": "[int('4')]",
+                "publicIpAddresses": [
+                  {
+                    "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPaddressName'))]"
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPaddressName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/publicIPAddresses",
+              "apiVersion": "2019-11-01",
+              "name": "[parameters('publicIPaddressName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard"
+              },
+              "properties": {
+                "publicIPAllocationMethod": "Static"
+              }
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Network/publicIPAddresses/{0}', parameters('publicIPaddressName'))]",
+              "name": "[format('ds-{0}-pip', parameters('publicIPaddressName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  },
+                  {
+                    "categoryGroup": "audit",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPaddressName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]"
+            },
+            "name": {
+              "type": "string",
+              "value": "[parameters('virtualNetworkName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', format('nsg-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('st{0}{1}-deployment', variables('name'), variables('uniqueSuffix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "storageName": {
+            "value": "[format('st{0}{1}', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "storagePleBlobName": {
+            "value": "[format('ple-{0}-{1}-st-blob', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "storagePleFileName": {
+            "value": "[format('ple-{0}-{1}-st-file', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "storageSkuName": {
+            "value": "Standard_LRS"
+          },
+          "subnetId": {
+            "value": "[format('{0}/subnets/snet-training', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "virtualNetworkId": {
+            "value": "[format('{0}', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')).outputs.logAnalyticsWorkspaceId.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "16674126902970578319"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region of the deployment"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to add to the resources"
+              }
+            },
+            "storageName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the storage account"
+              }
+            },
+            "storagePleBlobName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the storage blob private link endpoint"
+              }
+            },
+            "storagePleFileName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the storage file private link endpoint"
+              }
+            },
+            "subnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the subnet"
+              }
+            },
+            "virtualNetworkId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the virtual network"
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            },
+            "storageSkuName": {
+              "type": "string",
+              "defaultValue": "Standard_LRS",
+              "metadata": {
+                "description": "Storage SKU"
+              },
+              "allowedValues": [
+                "Standard_LRS",
+                "Standard_ZRS",
+                "Standard_GRS",
+                "Standard_GZRS",
+                "Standard_RAGRS",
+                "Standard_RAGZRS",
+                "Premium_LRS",
+                "Premium_ZRS"
+              ]
+            }
+          },
+          "variables": {
+            "storageNameCleaned": "[replace(parameters('storageName'), '-', '')]",
+            "blobPrivateDnsZoneName": "[format('privatelink.blob.{0}', environment().suffixes.storage)]",
+            "filePrivateDnsZoneName": "[format('privatelink.file.{0}', environment().suffixes.storage)]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2021-04-01",
+              "name": "[variables('storageNameCleaned')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('storageSkuName')]"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "accessTier": "Hot",
+                "allowBlobPublicAccess": false,
+                "allowCrossTenantReplication": false,
+                "allowSharedKeyAccess": true,
+                "encryption": {
+                  "keySource": "Microsoft.Storage",
+                  "requireInfrastructureEncryption": false,
+                  "services": {
+                    "blob": {
+                      "enabled": true,
+                      "keyType": "Account"
+                    },
+                    "file": {
+                      "enabled": true,
+                      "keyType": "Account"
+                    },
+                    "queue": {
+                      "enabled": true,
+                      "keyType": "Service"
+                    },
+                    "table": {
+                      "enabled": true,
+                      "keyType": "Service"
+                    }
+                  }
+                },
+                "isHnsEnabled": false,
+                "isNfsV3Enabled": false,
+                "keyPolicy": {
+                  "keyExpirationPeriodInDays": 7
+                },
+                "largeFileSharesState": "Disabled",
+                "minimumTlsVersion": "TLS1_2",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Deny"
+                },
+                "supportsHttpsTrafficOnly": true
+              }
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}/{1}', variables('storageNameCleaned'), 'default')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/fileServices",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}/{1}', variables('storageNameCleaned'), 'default')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2020-11-01",
+              "name": "[parameters('storagePleBlobName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[parameters('storagePleBlobName')]",
+                    "properties": {
+                      "groupIds": [
+                        "blob"
+                      ],
+                      "privateLinkServiceId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]",
+                      "privateLinkServiceConnectionState": {
+                        "status": "Approved",
+                        "description": "Auto-Approved",
+                        "actionsRequired": "None"
+                      }
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "[parameters('subnetId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2020-11-01",
+              "name": "[parameters('storagePleFileName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[parameters('storagePleFileName')]",
+                    "properties": {
+                      "groupIds": [
+                        "file"
+                      ],
+                      "privateLinkServiceId": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]",
+                      "privateLinkServiceConnectionState": {
+                        "status": "Approved",
+                        "description": "Auto-Approved",
+                        "actionsRequired": "None"
+                      }
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "[parameters('subnetId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones",
+              "apiVersion": "2020-01-01",
+              "name": "[variables('blobPrivateDnsZoneName')]",
+              "location": "global"
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[format('{0}/blob-PrivateDnsZoneGroup', parameters('storagePleBlobName'))]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "[variables('blobPrivateDnsZoneName')]",
+                    "properties": {
+                      "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('blobPrivateDnsZoneName'))]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('blobPrivateDnsZoneName'))]",
+                "[resourceId('Microsoft.Network/privateEndpoints', parameters('storagePleBlobName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+              "apiVersion": "2020-01-01",
+              "name": "[format('{0}/{1}', variables('blobPrivateDnsZoneName'), uniqueString(resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))))]",
+              "location": "global",
+              "properties": {
+                "registrationEnabled": false,
+                "virtualNetwork": {
+                  "id": "[parameters('virtualNetworkId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('blobPrivateDnsZoneName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones",
+              "apiVersion": "2020-01-01",
+              "name": "[variables('filePrivateDnsZoneName')]",
+              "location": "global"
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[format('{0}/file-PrivateDnsZoneGroup', parameters('storagePleFileName'))]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "[variables('filePrivateDnsZoneName')]",
+                    "properties": {
+                      "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('filePrivateDnsZoneName'))]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('filePrivateDnsZoneName'))]",
+                "[resourceId('Microsoft.Network/privateEndpoints', parameters('storagePleFileName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+              "apiVersion": "2020-01-01",
+              "name": "[format('{0}/{1}', variables('filePrivateDnsZoneName'), uniqueString(resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))))]",
+              "location": "global",
+              "properties": {
+                "registrationEnabled": false,
+                "virtualNetwork": {
+                  "id": "[parameters('virtualNetworkId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('filePrivateDnsZoneName'))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Storage/storageAccounts/{0}', variables('storageNameCleaned'))]",
+              "name": "[format('ds-{0}', parameters('storageName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [],
+                "metrics": [
+                  {
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Storage/storageAccounts/{0}/blobServices/{1}', variables('storageNameCleaned'), 'default')]",
+              "name": "[format('ds-{0}-blob', parameters('storageName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "StorageRead",
+                    "enabled": true
+                  },
+                  {
+                    "category": "StorageWrite",
+                    "enabled": true
+                  },
+                  {
+                    "category": "StorageDelete",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', variables('storageNameCleaned'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.Storage/storageAccounts/{0}/fileServices/{1}', variables('storageNameCleaned'), 'default')]",
+              "name": "[format('ds-{0}-file', parameters('storageName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "category": "StorageRead",
+                    "enabled": true
+                  },
+                  {
+                    "category": "StorageWrite",
+                    "enabled": true
+                  },
+                  {
+                    "category": "StorageDelete",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/fileServices', variables('storageNameCleaned'), 'default')]"
+              ]
+            }
+          ],
+          "outputs": {
+            "storageId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageNameCleaned'))]"
+            },
+            "storagName": {
+              "type": "string",
+              "value": "[variables('storageNameCleaned')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('kv-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "keyvaultName": {
+            "value": "[format('kv-{0}-{1}', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "keyvaultPleName": {
+            "value": "[format('ple-{0}-{1}-kv', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "subnetId": {
+            "value": "[format('{0}/subnets/snet-training', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "virtualNetworkId": {
+            "value": "[format('{0}', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')).outputs.logAnalyticsWorkspaceId.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "10863188656833322303"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "The Azure Region to deploy the resrouce group into"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to the Key Vault Instance"
+              }
+            },
+            "keyvaultName": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Key Vault"
+              }
+            },
+            "keyvaultPleName": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Key Vault private link endpoint"
+              }
+            },
+            "subnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "The Subnet ID where the Key Vault Private Link is to be created"
+              }
+            },
+            "virtualNetworkId": {
+              "type": "string",
+              "metadata": {
+                "description": "The VNet ID where the Key Vault Private Link is to be created"
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "privateDnsZoneName": "[format('privatelink{0}', environment().suffixes.keyvaultDns)]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults",
+              "apiVersion": "2021-04-01-preview",
+              "name": "[parameters('keyvaultName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "createMode": "default",
+                "enabledForDeployment": false,
+                "enabledForDiskEncryption": false,
+                "enabledForTemplateDeployment": false,
+                "enableSoftDelete": true,
+                "enableRbacAuthorization": true,
+                "enablePurgeProtection": true,
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Deny"
+                },
+                "sku": {
+                  "family": "A",
+                  "name": "standard"
+                },
+                "softDeleteRetentionInDays": 7,
+                "tenantId": "[subscription().tenantId]"
+              }
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2020-11-01",
+              "name": "[parameters('keyvaultPleName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[parameters('keyvaultPleName')]",
+                    "properties": {
+                      "groupIds": [
+                        "vault"
+                      ],
+                      "privateLinkServiceId": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))]",
+                      "privateLinkServiceConnectionState": {
+                        "status": "Approved",
+                        "description": "Auto-Approved",
+                        "actionsRequired": "None"
+                      }
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "[parameters('subnetId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones",
+              "apiVersion": "2020-01-01",
+              "name": "[variables('privateDnsZoneName')]",
+              "location": "global"
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[format('{0}/vault-PrivateDnsZoneGroup', parameters('keyvaultPleName'))]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "[variables('privateDnsZoneName')]",
+                    "properties": {
+                      "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName'))]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName'))]",
+                "[resourceId('Microsoft.Network/privateEndpoints', parameters('keyvaultPleName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+              "apiVersion": "2020-01-01",
+              "name": "[format('{0}/{1}', variables('privateDnsZoneName'), uniqueString(resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))))]",
+              "location": "global",
+              "properties": {
+                "registrationEnabled": false,
+                "virtualNetwork": {
+                  "id": "[parameters('virtualNetworkId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))]",
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.KeyVault/vaults/{0}', parameters('keyvaultName'))]",
+              "name": "[format('ds-{0}-kv', parameters('keyvaultName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  },
+                  {
+                    "categoryGroup": "audit",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "keyvaultId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvaultName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('cr{0}{1}-deployment', variables('name'), variables('uniqueSuffix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "containerRegistryName": {
+            "value": "[format('cr{0}{1}', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "containerRegistryPleName": {
+            "value": "[format('ple-{0}-{1}-cr', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "subnetId": {
+            "value": "[format('{0}/subnets/snet-training', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "virtualNetworkId": {
+            "value": "[format('{0}', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')).outputs.logAnalyticsWorkspaceId.value]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "699500485253198152"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region of the deployment"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to add to the resources"
+              }
+            },
+            "containerRegistryName": {
+              "type": "string",
+              "metadata": {
+                "description": "Container registry name"
+              }
+            },
+            "containerRegistryPleName": {
+              "type": "string",
+              "metadata": {
+                "description": "Container registry private link endpoint name"
+              }
+            },
+            "subnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the subnet"
+              }
+            },
+            "virtualNetworkId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the virtual network"
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            }
+          },
+          "variables": {
+            "containerRegistryNameCleaned": "[replace(parameters('containerRegistryName'), '-', '')]",
+            "privateDnsZoneName": "[format('privatelink{0}', environment().suffixes.acrLoginServer)]",
+            "groupName": "registry"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2020-11-01-preview",
+              "name": "[variables('containerRegistryNameCleaned')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Premium"
+              },
+              "properties": {
+                "adminUserEnabled": true,
+                "anonymousPullEnabled": false,
+                "dataEndpointEnabled": false,
+                "networkRuleBypassOptions": "AzureServices",
+                "networkRuleSet": {
+                  "defaultAction": "Deny"
+                },
+                "policies": {
+                  "quarantinePolicy": {
+                    "status": "enabled"
+                  },
+                  "retentionPolicy": {
+                    "status": "enabled",
+                    "days": 7
+                  },
+                  "trustPolicy": {
+                    "status": "disabled",
+                    "type": "Notary"
+                  }
+                },
+                "publicNetworkAccess": "Disabled",
+                "zoneRedundancy": "Disabled"
+              }
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints",
+              "apiVersion": "2020-11-01",
+              "name": "[parameters('containerRegistryPleName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "privateLinkServiceConnections": [
+                  {
+                    "name": "[parameters('containerRegistryPleName')]",
+                    "properties": {
+                      "groupIds": [
+                        "[variables('groupName')]"
+                      ],
+                      "privateLinkServiceId": "[resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryNameCleaned'))]"
+                    }
+                  }
+                ],
+                "subnet": {
+                  "id": "[parameters('subnetId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones",
+              "apiVersion": "2020-01-01",
+              "name": "[variables('privateDnsZoneName')]",
+              "location": "global"
+            },
+            {
+              "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+              "apiVersion": "2020-06-01",
+              "name": "[format('{0}/{1}-PrivateDnsZoneGroup', parameters('containerRegistryPleName'), variables('groupName'))]",
+              "properties": {
+                "privateDnsZoneConfigs": [
+                  {
+                    "name": "[variables('privateDnsZoneName')]",
+                    "properties": {
+                      "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName'))]"
+                    }
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName'))]",
+                "[resourceId('Microsoft.Network/privateEndpoints', parameters('containerRegistryPleName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+              "apiVersion": "2020-01-01",
+              "name": "[format('{0}/{1}', variables('privateDnsZoneName'), uniqueString(resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryNameCleaned'))))]",
+              "location": "global",
+              "properties": {
+                "registrationEnabled": false,
+                "virtualNetwork": {
+                  "id": "[parameters('virtualNetworkId')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName'))]",
+                "[resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryNameCleaned'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.ContainerRegistry/registries/{0}', variables('containerRegistryNameCleaned'))]",
+              "name": "[format('ds-{0}-cr', variables('containerRegistryNameCleaned'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  },
+                  {
+                    "categoryGroup": "audit",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryNameCleaned'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "containerRegistryId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.ContainerRegistry/registries', variables('containerRegistryNameCleaned'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('appi-{0}-{1}-deployment', parameters('prefix'), variables('uniqueSuffix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "applicationInsightsName": {
+            "value": "[format('appi-{0}-{1}', parameters('prefix'), variables('uniqueSuffix'))]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "3632840967126137987"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "defaultValue": "[resourceGroup().location]",
+              "metadata": {
+                "description": "Azure region of the deployment"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to add to the resources"
+              }
+            },
+            "applicationInsightsName": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights resource name"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('applicationInsightsName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "web",
+              "properties": {
+                "Application_Type": "web",
+                "DisableIpMasking": false,
+                "DisableLocalAuth": false,
+                "Flow_Type": "Bluefield",
+                "ForceCustomerStorageForProfiler": false,
+                "ImmediatePurgeDataOn30Days": true,
+                "IngestionMode": "ApplicationInsights",
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Disabled",
+                "Request_Source": "rest"
+              }
+            }
+          ],
+          "outputs": {
+            "applicationInsightsId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('mlw-{0}-{1}-deployment', parameters('prefix'), variables('uniqueSuffix'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "machineLearningName": {
+            "value": "[format('mlw-{0}-{1}', parameters('prefix'), variables('uniqueSuffix'))]"
+          },
+          "machineLearningFriendlyName": {
+            "value": "Private link endpoint sample workspace"
+          },
+          "machineLearningDescription": {
+            "value": "This is an example workspace having a private link endpoint."
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": {}
+          },
+          "applicationInsightsId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('appi-{0}-{1}-deployment', parameters('prefix'), variables('uniqueSuffix')))).outputs.applicationInsightsId.value]"
+          },
+          "containerRegistryId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('cr{0}{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.containerRegistryId.value]"
+          },
+          "keyVaultId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('kv-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.keyvaultId.value]"
+          },
+          "storageAccountId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', format('st{0}{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.storageId.value]"
+          },
+          "subnetId": {
+            "value": "[format('{0}/subnets/snet-training', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "virtualNetworkId": {
+            "value": "[format('{0}', reference(resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))).outputs.id.value)]"
+          },
+          "machineLearningPleName": {
+            "value": "[format('ple-{0}-{1}-mlw', variables('name'), variables('uniqueSuffix'))]"
+          },
+          "logAnalyticsWorkspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')).outputs.logAnalyticsWorkspaceId.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.4.1318.3566",
+              "templateHash": "125272432284815329"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region of the deployment"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Tags to add to the resources"
+              }
+            },
+            "machineLearningName": {
+              "type": "string",
+              "metadata": {
+                "description": "Machine learning workspace name"
+              }
+            },
+            "machineLearningFriendlyName": {
+              "type": "string",
+              "defaultValue": "[parameters('machineLearningName')]",
+              "metadata": {
+                "description": "Machine learning workspace display name"
+              }
+            },
+            "machineLearningDescription": {
+              "type": "string",
+              "metadata": {
+                "description": "Machine learning workspace description"
+              }
+            },
+            "applicationInsightsId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the application insights resource"
+              }
+            },
+            "containerRegistryId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the container registry resource"
+              }
+            },
+            "keyVaultId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the key vault resource"
+              }
+            },
+            "storageAccountId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the storage account resource"
+              }
+            },
+            "subnetId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the subnet resource"
+              }
+            },
+            "virtualNetworkId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the virtual network"
+              }
+            },
+            "machineLearningPleName": {
+              "type": "string",
+              "metadata": {
+                "description": "Machine learning workspace private link endpoint name"
+              }
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string"
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.MachineLearningServices/workspaces",
+              "apiVersion": "2021-07-01",
+              "name": "[parameters('machineLearningName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "friendlyName": "[parameters('machineLearningFriendlyName')]",
+                "description": "[parameters('machineLearningDescription')]",
+                "applicationInsights": "[parameters('applicationInsightsId')]",
+                "containerRegistry": "[parameters('containerRegistryId')]",
+                "keyVault": "[parameters('keyVaultId')]",
+                "storageAccount": "[parameters('storageAccountId')]",
+                "publicNetworkAccess": "Enabled",
+                "allowPublicAccessWhenBehindVnet": true
+              }
+            },
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[format('Microsoft.MachineLearningServices/workspaces/{0}', parameters('machineLearningName'))]",
+              "name": "[format('ds-{0}-ml', parameters('machineLearningName'))]",
+              "properties": {
+                "workspaceId": "[parameters('logAnalyticsWorkspaceId')]",
+                "logs": [
+                  {
+                    "categoryGroup": "allLogs",
+                    "enabled": true
+                  },
+                  {
+                    "categoryGroup": "audit",
+                    "enabled": true
+                  }
+                ],
+                "metrics": [
+                  {
+                    "enabled": true
+                  }
+                ]
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('machineLearningName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2020-10-01",
+              "name": "machineLearningNetworking",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "location": {
+                    "value": "[parameters('location')]"
+                  },
+                  "tags": {
+                    "value": "[parameters('tags')]"
+                  },
+                  "virtualNetworkId": {
+                    "value": "[parameters('virtualNetworkId')]"
+                  },
+                  "workspaceArmId": {
+                    "value": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('machineLearningName'))]"
+                  },
+                  "subnetId": {
+                    "value": "[parameters('subnetId')]"
+                  },
+                  "machineLearningPleName": {
+                    "value": "[parameters('machineLearningPleName')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.4.1318.3566",
+                      "templateHash": "17133701183869157668"
+                    }
+                  },
+                  "parameters": {
+                    "location": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Azure region of the deployment"
+                      }
+                    },
+                    "machineLearningPleName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Machine learning workspace private link endpoint name"
+                      }
+                    },
+                    "virtualNetworkId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the virtual network resource"
+                      }
+                    },
+                    "subnetId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the subnet resource"
+                      }
+                    },
+                    "workspaceArmId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Resource ID of the machine learning workspace"
+                      }
+                    },
+                    "tags": {
+                      "type": "object",
+                      "metadata": {
+                        "description": "Tags to add to the resources"
+                      }
+                    }
+                  },
+                  "variables": {
+                    "privateDnsZoneName": {
+                      "azureusgovernment": "privatelink.api.ml.azure.us",
+                      "azurechinacloud": "privatelink.api.ml.azure.cn",
+                      "azurecloud": "privatelink.api.azureml.ms"
+                    },
+                    "privateAznbDnsZoneName": {
+                      "azureusgovernment": "privatelink.notebooks.usgovcloudapi.net",
+                      "azurechinacloud": "privatelink.notebooks.chinacloudapi.cn",
+                      "azurecloud": "privatelink.notebooks.azure.net"
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Network/privateEndpoints",
+                      "apiVersion": "2021-05-01",
+                      "name": "[parameters('machineLearningPleName')]",
+                      "location": "[parameters('location')]",
+                      "tags": "[parameters('tags')]",
+                      "properties": {
+                        "privateLinkServiceConnections": [
+                          {
+                            "name": "[parameters('machineLearningPleName')]",
+                            "properties": {
+                              "groupIds": [
+                                "amlworkspace"
+                              ],
+                              "privateLinkServiceId": "[parameters('workspaceArmId')]"
+                            }
+                          }
+                        ],
+                        "subnet": {
+                          "id": "[parameters('subnetId')]"
+                        }
+                      }
+                    },
+                    {
+                      "type": "Microsoft.Network/privateDnsZones",
+                      "apiVersion": "2020-06-01",
+                      "name": "[variables('privateDnsZoneName')[toLower(environment().name)]]",
+                      "location": "global"
+                    },
+                    {
+                      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                      "apiVersion": "2020-06-01",
+                      "name": "[format('{0}/{1}', variables('privateDnsZoneName')[toLower(environment().name)], uniqueString(parameters('workspaceArmId')))]",
+                      "location": "global",
+                      "properties": {
+                        "registrationEnabled": false,
+                        "virtualNetwork": {
+                          "id": "[parameters('virtualNetworkId')]"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName')[toLower(environment().name)])]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.Network/privateDnsZones",
+                      "apiVersion": "2020-06-01",
+                      "name": "[variables('privateAznbDnsZoneName')[toLower(environment().name)]]",
+                      "location": "global"
+                    },
+                    {
+                      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+                      "apiVersion": "2020-06-01",
+                      "name": "[format('{0}/{1}', variables('privateAznbDnsZoneName')[toLower(environment().name)], uniqueString(parameters('workspaceArmId')))]",
+                      "location": "global",
+                      "properties": {
+                        "registrationEnabled": false,
+                        "virtualNetwork": {
+                          "id": "[parameters('virtualNetworkId')]"
+                        }
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', variables('privateAznbDnsZoneName')[toLower(environment().name)])]"
+                      ]
+                    },
+                    {
+                      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+                      "apiVersion": "2021-05-01",
+                      "name": "[format('{0}/amlworkspace-PrivateDnsZoneGroup', parameters('machineLearningPleName'))]",
+                      "properties": {
+                        "privateDnsZoneConfigs": [
+                          {
+                            "name": "[variables('privateDnsZoneName')[environment().name]]",
+                            "properties": {
+                              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName')[toLower(environment().name)])]"
+                            }
+                          },
+                          {
+                            "name": "[variables('privateAznbDnsZoneName')[environment().name]]",
+                            "properties": {
+                              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', variables('privateAznbDnsZoneName')[toLower(environment().name)])]"
+                            }
+                          }
+                        ]
+                      },
+                      "dependsOn": [
+                        "[resourceId('Microsoft.Network/privateDnsZones', variables('privateDnsZoneName')[toLower(environment().name)])]",
+                        "[resourceId('Microsoft.Network/privateEndpoints', parameters('machineLearningPleName'))]",
+                        "[resourceId('Microsoft.Network/privateDnsZones', variables('privateAznbDnsZoneName')[toLower(environment().name)])]"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('machineLearningName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "machineLearningId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.MachineLearningServices/workspaces', parameters('machineLearningName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', format('appi-{0}-{1}-deployment', parameters('prefix'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.Resources/deployments', format('cr{0}{1}-deployment', variables('name'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.Resources/deployments', format('kv-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.Resources/deployments', 'logAnalyticsWorkspaceName-deployment')]",
+        "[resourceId('Microsoft.Resources/deployments', format('st{0}{1}-deployment', variables('name'), variables('uniqueSuffix')))]",
+        "[resourceId('Microsoft.Resources/deployments', format('vnet-{0}-{1}-deployment', variables('name'), variables('uniqueSuffix')))]"
+      ]
+    }
+  ]
+}
